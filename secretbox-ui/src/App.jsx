@@ -40,7 +40,7 @@ function App() {
   const [menuSort, setMenuSort] = useState('default');
   
   const [analyticsData, setAnalyticsData] = useState([]);
-  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  const [loadingAnalysis, setLoadingAnalysis] = useState(Boolean(localStorage.getItem('token')));
 
   // Состояния для чата
   const [chatMessages, setChatMessages] = useState([]);
@@ -50,6 +50,17 @@ function App() {
   const getAuthHeader = () => ({
     headers: { Authorization: `Bearer ${token}` }
   });
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setToken('');
+    setShops([]);
+    setSelectedShop('');
+    setMenu({});
+    setAnalyticsData([]);
+    setLoadingAnalysis(false);
+    setChatMessages([]);
+  };
 
   // Автоматическая прокрутка чата вниз
   const scrollToBottom = () => {
@@ -81,7 +92,6 @@ function App() {
 
   useEffect(() => {
     if (!token) return;
-    setLoadingAnalysis(true);
     axios.get(`${API_URL}/analytics/compare`, getAuthHeader())
       .then(response => {
         setAnalyticsData(response.data);
@@ -118,6 +128,7 @@ function App() {
       .then(response => {
         const receivedToken = response.data.token;
         localStorage.setItem('token', receivedToken);
+        setLoadingAnalysis(true);
         setToken(receivedToken);
         setUsername('');
         setPassword('');
@@ -141,16 +152,6 @@ function App() {
       .catch(error => {
         setMessage(error.response?.data?.detail || 'Ошибка регистрации');
       });
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    setToken('');
-    setShops([]);
-    setSelectedShop('');
-    setMenu({});
-    setAnalyticsData([]);
-    setChatMessages([]);
   };
 
   // Отправка сообщения в чат

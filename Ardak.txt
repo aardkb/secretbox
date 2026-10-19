@@ -1,0 +1,5 @@
+git config user.name "aardkb"
+git config user.email "ardak20092009@gmail.com"
+git status
+git commit -m "Добавил поиск и фильтры в каталог"
+git push
