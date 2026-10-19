@@ -5,6 +5,22 @@ import './App.css';
 const API_URL = 'https://secretbox-main.onrender.com'; 
 //const API_URL = 'http://127.0.0.1:8000'; 
 
+const getDrinkCategory = (name) => {
+  const normalizedName = name.toLocaleLowerCase('ru');
+
+  if (/(матча|matcha)/.test(normalizedName)) return 'Матча';
+  if (/(чай|tea|ист-ти)/.test(normalizedName)) return 'Чай';
+  if (/(смузи|милкшейк|лимонад|фрап|глинтвейн)/.test(normalizedName)) return 'Холодные напитки';
+  if (/(кофе|coffee|эспрессо|espresso|американо|латте|капучино|раф|мокка|гляссе)/.test(normalizedName)) return 'Кофе';
+
+  return 'Другое';
+};
+
+const getPriceValue = (price) => {
+  const digits = String(price).replace(/\D/g, '');
+  return digits ? Number(digits) : null;
+};
+
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || '');
   const [isRegisterMode, setIsRegisterMode] = useState(false);
@@ -17,6 +33,11 @@ function App() {
   const [shops, setShops] = useState([]);
   const [selectedShop, setSelectedShop] = useState('');
   const [menu, setMenu] = useState({});
+  const [menuSearch, setMenuSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('Все категории');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [menuSort, setMenuSort] = useState('default');
   
   const [analyticsData, setAnalyticsData] = useState([]);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
@@ -157,6 +178,30 @@ function App() {
   };
 
   const analyticsColumns = getAnalyticsColumns();
+  const menuCategories = [...new Set(Object.keys(menu).map(getDrinkCategory))];
+  const filteredMenu = Object.entries(menu)
+    .filter(([item, price]) => {
+      const normalizedSearch = menuSearch.trim().toLocaleLowerCase('ru');
+      const numericPrice = getPriceValue(price);
+
+      return (
+        item.toLocaleLowerCase('ru').includes(normalizedSearch) &&
+        (categoryFilter === 'Все категории' || getDrinkCategory(item) === categoryFilter) &&
+        (minPrice === '' || (numericPrice !== null && numericPrice >= Number(minPrice))) &&
+        (maxPrice === '' || (numericPrice !== null && numericPrice <= Number(maxPrice)))
+      );
+    })
+    .sort(([itemA, priceA], [itemB, priceB]) => {
+      if (menuSort === 'price-asc' || menuSort === 'price-desc') {
+        const valueA = getPriceValue(priceA);
+        const valueB = getPriceValue(priceB);
+        if (valueA === null) return valueB === null ? 0 : 1;
+        if (valueB === null) return -1;
+        return menuSort === 'price-asc' ? valueA - valueB : valueB - valueA;
+      }
+      if (menuSort === 'name-asc') return itemA.localeCompare(itemB, 'ru');
+      return 0;
+    });
 
   if (!token) {
     return (
@@ -250,22 +295,82 @@ function App() {
           </select>
           
           {Object.keys(menu).length > 0 && (
-            <table className="menu-table">
-              <thead>
-                <tr>
-                  <th>Напиток</th>
-                  <th>Цена</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(menu).map(([item, price]) => (
-                  <tr key={item}>
-                    <td>{item}</td>
-                    <td>{price}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <>
+              <div className="catalog-filters">
+                <label className="catalog-filter">
+                  <span>Поиск по названию</span>
+                  <input
+                    type="search"
+                    value={menuSearch}
+                    onChange={(e) => setMenuSearch(e.target.value)}
+                    placeholder="Например, латте"
+                  />
+                </label>
+                <label className="catalog-filter">
+                  <span>Категория</span>
+                  <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                    <option>Все категории</option>
+                    {menuCategories.map(category => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="catalog-filter">
+                  <span>Цена от, ₸</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={minPrice}
+                    onChange={(e) => setMinPrice(e.target.value)}
+                    placeholder="Без ограничения"
+                  />
+                </label>
+                <label className="catalog-filter">
+                  <span>Цена до, ₸</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={maxPrice}
+                    onChange={(e) => setMaxPrice(e.target.value)}
+                    placeholder="Без ограничения"
+                  />
+                </label>
+                <label className="catalog-filter">
+                  <span>Сортировка</span>
+                  <select value={menuSort} onChange={(e) => setMenuSort(e.target.value)}>
+                    <option value="default">По умолчанию</option>
+                    <option value="name-asc">По названию</option>
+                    <option value="price-asc">Сначала дешевле</option>
+                    <option value="price-desc">Сначала дороже</option>
+                  </select>
+                </label>
+              </div>
+              <p className="catalog-results">
+                Показано {filteredMenu.length} из {Object.keys(menu).length} напитков
+              </p>
+              {filteredMenu.length > 0 ? (
+                <div className="table-container">
+                  <table className="menu-table">
+                    <thead>
+                      <tr>
+                        <th>Напиток</th>
+                        <th>Цена</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredMenu.map(([item, price]) => (
+                        <tr key={item}>
+                          <td>{item}</td>
+                          <td>{price}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="catalog-empty">По заданным фильтрам напитки не найдены.</p>
+              )}
+            </>
           )}
         </div>
 
